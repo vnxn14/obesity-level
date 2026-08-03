@@ -3,7 +3,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-df = pd.read_csv(r"C:\Users\yongxinn\OneDrive\Desktop\DS asm\ObesityDataSet_raw_and_data_sinthetic.csv")
+df = pd.read_csv("ObesityDataSet_raw_and_data_sinthetic.csv")
 print("Data loaded successfully!")
 print("Initial shape of the dataset:", df.shape)
 
