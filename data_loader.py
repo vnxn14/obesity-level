@@ -32,7 +32,7 @@ print("--- Deduplication Audit ---")
 print(f"Original shape: {df.shape} | Cleaned shape: {df_clean.shape}")
 print(f"Dropped {duplicate_count} duplicate row(s).\n")
 
-# GRAPH B: Deduplication Row Counts Comparison
+# Deduplication Row Counts Comparison graph
 plt.figure(figsize=(6, 4))
 bars = plt.bar(
     ['Original Raw Rows', 'After Removing Duplicates'], 
@@ -77,14 +77,15 @@ df_clean['Weight'] = df_clean['Weight'].round(1)
 behavioral_cols = ['Veg_Consumption', 'Num_Main_Meals', 'Water_Intake', 'Physical_Activity', 'Tech_Usage_Time']
 df_clean[behavioral_cols] = df_clean[behavioral_cols].round(2)
 
-# Feature Engineering: BMI Calculation
+
+# --- 5. FEATURE ENGINEERING: BMI Calculation ---
 df_clean['BMI'] = (df_clean['Weight'] / (df_clean['Height'] ** 2)).round(2)
 
 # Save unscaled copy of weight for comparison graphics later
 raw_weight_snapshot = df_clean['Weight'].copy()
 
 
-# --- 5. CATEGORICAL ENCODING ---
+# --- 6. CATEGORICAL ENCODING ---
 # Binary Encoding
 binary_map = {'yes': 1, 'no': 0, 'male': 1, 'female': 0}
 binary_cols = ['Gender', 'Family_History', 'High_Caloric_Food', 'SMOKE', 'Calorie_Monitoring']
@@ -119,7 +120,7 @@ if len(bool_cols) > 0:
     df_clean[bool_cols] = df_clean[bool_cols].astype(int)
 
 
-# --- 6. FEATURE SCALING & VERIFICATION ---
+# --- 7. FEATURE SCALING & VERIFICATION ---
 scaler = StandardScaler()
 scaled_features = [
     'Age', 'Height', 'Weight', 'Veg_Consumption',
@@ -130,7 +131,7 @@ scaled_features = [
 df_scaled = df_clean.copy()
 df_scaled[scaled_features] = scaler.fit_transform(df_scaled[scaled_features])
 
-# GRAPH C: Distribution Plot Before vs. After Scaling
+# Distribution Plot Before vs. After Scaling graph
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
 # Left Plot: Raw values
@@ -152,7 +153,7 @@ plt.tight_layout()
 plt.show()
 
 
-# --- 7. DATA SPLITTING ---
+# --- 8. DATA SPLITTING ---
 X = df_scaled.drop(columns=['Obesity_Level', 'Obesity_Level_Encoded'])
 y = df_scaled['Obesity_Level_Encoded']
 

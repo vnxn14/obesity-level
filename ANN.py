@@ -6,10 +6,9 @@ from keras.utils import to_categorical
 from sklearn.metrics import classification_report
 
 # DIRECTLY CALL THE LOADER FILE AND IMPORT THE PYTHON FUNCTION
-from data_loader import load_and_preprocess_data
+from data_loader import X_train, X_test, y_train, y_test, df_test_unscaled
 
 print("[INFO] Fetching data directly from data_loader.py function...")
-X_train, X_test, y_train, y_test, df_test_unscaled = load_and_preprocess_data()
 
 # Convert labels to One-Hot Encoding for the Neural Network
 num_classes = 7
