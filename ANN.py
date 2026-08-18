@@ -1,58 +1,44 @@
-import numpy as np
-import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Dense, Dropout
-from keras.utils import to_categorical
-from sklearn.metrics import classification_report
+import pandas as pd
+from sklearn.neural_network import MLPClassifier
 
-# DIRECTLY CALL THE LOADER FILE AND IMPORT THE PYTHON FUNCTION
-from data_loader import X_train, X_test, y_train, y_test, df_test_unscaled
+from data_loader import load_all_processed_data
 
-print("[INFO] Fetching data directly from data_loader.py function...")
+def train_ann_model():
+    """
+    Fetches preprocessed matrices directly from the data_loader cache
+    and trains an Artificial Neural Network (MLPClassifier).
+    """
+    # Unpack everything instantly from memory (prevents duplicate CSV reading)
+    X_train_scaled, X_test_scaled, y_train, y_test, scaler, X = load_all_processed_data()
+    
+    # Train ANN Model (Multi-Layer Perceptron)
+    # Using 2 hidden layers (64 neurons and 32 neurons) with adam optimizer
+    ann_model = MLPClassifier(hidden_layer_sizes=(64, 32), activation='relu', solver='adam', max_iter=500, random_state=42)
+    ann_model.fit(X_train_scaled, y_train)
+    
+    # Evaluate performance
+    accuracy = ann_model.score(X_test_scaled, y_test) * 100
+    
+    # Return model runtime requirements back to the dashboard loop
+    return ann_model, scaler, X_train_scaled.columns, accuracy
 
-# Convert labels to One-Hot Encoding for the Neural Network
-num_classes = 7
-y_train_encoded = to_categorical(y_train, num_classes=num_classes)
-y_test_encoded = to_categorical(y_test, num_classes=num_classes)
-
-# =========================================================================
-# MODEL TRAINING & EVALUATION (Same as before but running directly from variables)
-# =========================================================================
-model = Sequential([
-    Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-    Dropout(0.2),
-    Dense(32, activation='relu'),
-    Dropout(0.2),
-    Dense(num_classes, activation='softmax')
-])
-
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-
-print("\n[INFO] Training ANN...")
-model.fit(X_train, y_train_encoded, validation_split=0.1, epochs=50, batch_size=32, verbose=1)
-
-print("\n[INFO] Generating Evaluation Metrics...")
-y_pred_probs = model.predict(X_test, verbose=0)
-y_pred_classes = np.argmax(y_pred_probs, axis=1)
-print(classification_report(y_test, y_pred_classes))
-
-# =========================================================================
-# USER TESTING DEMO (Using the unscaled data directly from the loader)
-# =========================================================================
-print("\n[INFO] Simulating User Testing...")
-inverse_target_map = {
-    0: 'Insufficient_Weight', 1: 'Normal_Weight', 2: 'Overweight_Level_I',
-    3: 'Overweight_Level_II', 4: 'Obesity_Type_I', 5: 'Obesity_Type_II', 6: 'Obesity_Type_III'
-}
-
-# Grab the first raw record from our memory object
-single_user_raw = df_test_unscaled.iloc[0]
-print(f" -> Mock Form Input Summary: Age {single_user_raw['Age']}, Weight {single_user_raw['Weight']}kg")
-print(f" -> Real Medical Label: {single_user_raw['Obesity_Level']}")
-
-# Extract corresponding scaled feature vectors from X_test 
-single_user_scaled = X_test.iloc[[0]]
-
-# Predict
-user_pred = np.argmax(model.predict(single_user_scaled, verbose=0), axis=1)
-print(f" -> ANN Predicted Label: {inverse_target_map[user_pred[0]]}")
+def predict_ann(single_input_df):
+    """
+    Accepts single instance unscaled input metrics, applies historical 
+    fitted scaling parameters, and returns the classification integer.
+    """
+    # Fetch trained model and pipeline structures
+    model, scaler, expected_columns_order, accuracy = train_ann_model()
+    
+    # Force identical feature column arrangement matching baseline limits
+    single_input_df = single_input_df[expected_columns_order]
+    
+    # Scale user input numbers using the original dataset scale weights
+    scaled_features = ['Age', 'Height', 'Weight', 'Veg_Consumption', 'Num_Main_Meals', 'Water_Intake', 'Physical_Activity', 'Tech_Usage_Time', 'BMI']
+    processed_input = single_input_df.copy()
+    processed_input[scaled_features] = scaler.transform(single_input_df[scaled_features])
+    
+    # Process prediction
+    predicted_encoded_output = model.predict(processed_input)
+    
+    return int(predicted_encoded_output), accuracy
