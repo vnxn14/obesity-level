@@ -4,6 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from ANN import predict_ann
+from KNN import train_knn_model, predict_knn
 
 # Page configurations
 st.set_page_config(page_title="Obesity Risk Predictor", layout="wide")
@@ -156,12 +157,26 @@ def render_gauge(position_pct: float, label: str):
         y0=-0.25, y1=1.25,
         line=dict(color="black", width=3),
     )
+
+    # Anchor the label away from the marker near either edge so long labels
+    # (e.g. "Insufficient Weight", "Obesity Type III") don't get clipped by
+    # the plot boundary when the marker sits at x=0 or x=100.
+    if position_pct >= 85:
+        xanchor = "right"
+    elif position_pct <= 15:
+        xanchor = "left"
+    else:
+        xanchor = "center"
+
     fig.add_annotation(
         x=position_pct, y=1.5, showarrow=False,
-        text=f"<b>{label}</b>", font=dict(size=13)
+        text=f"<b>{label}</b>", font=dict(size=13),
+        xanchor=xanchor,
     )
 
-    fig.update_xaxes(range=[0, 100], visible=False)
+    # Small padding on the x-axis range so edge labels have room to render
+    # even with center anchoring, and so the marker line isn't flush with the frame.
+    fig.update_xaxes(range=[-8, 108], visible=False)
     fig.update_yaxes(range=[-0.5, 2], visible=False)
     fig.update_layout(
         height=110,
@@ -209,9 +224,65 @@ def render_bmi_reference_table(predicted_label: str) -> str:
     """
 
 
+def display_prediction_results(prediction_index: int, accuracy_score: float, probabilities):
+    """Shared results UI for any model: gauge, confidence, probability chart, BMI reference.
+    Used by both the ANN and KNN branches so the two models render identically."""
+    predicted_label = target_reverse_map.get(prediction_index, "Unknown Class")
+    position_pct = (prediction_index / (len(CLASS_ORDER) - 1)) * 100
+
+    # st.container(border=True) actually wraps everything placed inside it,
+    # unlike two separate st.markdown('<div>') / st.markdown('</div>') calls.
+    with st.container(border=True):
+
+        top_col1, top_col2, top_col3 = st.columns(3)
+        with top_col1:
+            st.markdown('<p class="result-label">Predicted category</p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="result-value">{predicted_label}</p>', unsafe_allow_html=True)
+        with top_col2:
+            st.markdown('<p class="result-label">Model benchmark accuracy</p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="result-value">{accuracy_score:.1f}%</p>', unsafe_allow_html=True)
+        with top_col3:
+            st.markdown('<p class="result-label">Calculated BMI</p>', unsafe_allow_html=True)
+            st.markdown(f'<p class="result-value">{raw_input_data["BMI"]}</p>', unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        st.plotly_chart(render_gauge(position_pct, predicted_label), use_container_width=True)
+
+        if probabilities is not None:
+            st.markdown('<p class="result-label">Probability by class</p>', unsafe_allow_html=True)
+            st.plotly_chart(
+                render_probability_bar(np.asarray(probabilities), prediction_index),
+                use_container_width=True
+            )
+        else:
+            st.markdown(
+                '<p class="small-note">Per-class probability breakdown unavailable for this model.</p>',
+                unsafe_allow_html=True
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        with st.expander("📖 Understanding this result — BMI classification reference"):
+            st.markdown(render_bmi_reference_table(predicted_label), unsafe_allow_html=True)
+            st.markdown(
+                '<p class="small-note" style="margin-top:8px;">'
+                'BMI = weight (kg) ÷ height (m)². These ranges follow the standard '
+                'classification used in the model\'s training dataset and are for '
+                'general reference, not a medical diagnosis.</p>',
+                unsafe_allow_html=True
+            )
+
+
+@st.cache_resource
+def get_trained_knn_model():
+    """Trains KNN once per session instead of on every button click."""
+    return train_knn_model()
+
+
 # --- 5. PREDICTION TRIGGERS ---
 st.markdown("---")
-if st.button("Result", type="primary"):
+if st.button("Run", type="primary"):
 
     if selected_model == "ANN (Artificial Neural Network)":
         with st.spinner("Processing Artificial Neural Network..."):
@@ -224,55 +295,27 @@ if st.button("Result", type="primary"):
                 else:
                     prediction_index, accuracy_score = result
 
-                predicted_label = target_reverse_map.get(prediction_index, "Unknown Class")
-                position_pct = (prediction_index / (len(CLASS_ORDER) - 1)) * 100
-
-                # st.container(border=True) actually wraps everything placed inside it,
-                # unlike two separate st.markdown('<div>') / st.markdown('</div>') calls.
-                with st.container(border=True):
-
-                    top_col1, top_col2, top_col3 = st.columns(3)
-                    with top_col1:
-                        st.markdown('<p class="result-label">Predicted category</p>', unsafe_allow_html=True)
-                        st.markdown(f'<p class="result-value">{predicted_label}</p>', unsafe_allow_html=True)
-                    with top_col2:
-                        st.markdown('<p class="result-label">Model benchmark accuracy</p>', unsafe_allow_html=True)
-                        st.markdown(f'<p class="result-value">{accuracy_score:.1f}%</p>', unsafe_allow_html=True)
-                    with top_col3:
-                        st.markdown('<p class="result-label">Calculated BMI</p>', unsafe_allow_html=True)
-                        st.markdown(f'<p class="result-value">{raw_input_data["BMI"]}</p>', unsafe_allow_html=True)
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    st.plotly_chart(render_gauge(position_pct, predicted_label), use_container_width=True)
-
-                    if probabilities is not None:
-                        st.markdown('<p class="result-label">Probability by class</p>', unsafe_allow_html=True)
-                        st.plotly_chart(
-                            render_probability_bar(np.asarray(probabilities), prediction_index),
-                            use_container_width=True
-                        )
-                    else:
-                        st.markdown(
-                            '<p class="small-note">Per-class probability breakdown unavailable — '
-                            'update <code>predict_ann()</code> in ANN.py to also return the raw '
-                            'prediction array (e.g. <code>model.predict_proba(input_df)[0]</code>).</p>',
-                            unsafe_allow_html=True
-                        )
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    with st.expander("📖 Understanding this result — BMI classification reference"):
-                        st.markdown(render_bmi_reference_table(predicted_label), unsafe_allow_html=True)
-                        st.markdown(
-                            '<p class="small-note" style="margin-top:8px;">'
-                            'BMI = weight (kg) ÷ height (m)². These ranges follow the standard '
-                            'classification used in the model\'s training dataset and are for '
-                            'general reference, not a medical diagnosis.</p>',
-                            unsafe_allow_html=True
-                        )
+                display_prediction_results(prediction_index, accuracy_score, probabilities)
 
             except Exception as e:
                 st.error(f"An unexpected computational error occurred: {e}")
+
+    elif selected_model == "KNN (K-Nearest Neighbors)":
+        with st.spinner("Processing K-Nearest Neighbors..."):
+            try:
+                model, scaler, expected_columns_order, accuracy_score = get_trained_knn_model()
+                result = predict_knn(model, scaler, expected_columns_order, input_df)
+
+                probabilities = None
+                if isinstance(result, tuple) and len(result) == 2:
+                    prediction_index, probabilities = result
+                else:
+                    prediction_index = result
+
+                display_prediction_results(prediction_index, accuracy_score, probabilities)
+
+            except Exception as e:
+                st.error(f"An unexpected computational error occurred: {e}")
+
     else:
-        st.warning(f"Functional pipelines for **{selected_model}** are currently preparation blueprints. Please select **ANN** to run predictions.")
+        st.warning(f"Functional pipelines for **{selected_model}** are currently preparation blueprints. Please select **ANN** or **KNN** to run predictions.")
