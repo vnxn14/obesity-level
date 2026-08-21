@@ -25,20 +25,31 @@ def train_ann_model():
 def predict_ann(single_input_df):
     """
     Accepts single instance unscaled input metrics, applies historical 
-    fitted scaling parameters, and returns the classification integer.
+    fitted scaling parameters, and returns the classification integer
+    along with the model's per-class probability distribution.
     """
     # Fetch trained model and pipeline structures
     model, scaler, expected_columns_order, accuracy = train_ann_model()
     
-    # Force identical feature column arrangement matching baseline limits
-    single_input_df = single_input_df[expected_columns_order]
+    # --- ADD THIS SAFE ALIGNMENT STEP ---
+    # Creates a case-insensitive dictionary map of your input data columns
+    normalized_data = {col.lower(): single_input_df[col].values[0] for col in single_input_df.columns}
+    
+    # Rebuild input dataframe using the EXACT cased sequence expected by the model
+    aligned_data = {}
+    for col in expected_columns_order:
+        aligned_data[col] = normalized_data.get(col.lower(), 0) # Fallback to 0 if a key is missing
+        
+    final_input_df = pd.DataFrame([aligned_data])
+    # -------------------------------------
     
     # Scale user input numbers using the original dataset scale weights
     scaled_features = ['Age', 'Height', 'Weight', 'Veg_Consumption', 'Num_Main_Meals', 'Water_Intake', 'Physical_Activity', 'Tech_Usage_Time', 'BMI']
-    processed_input = single_input_df.copy()
-    processed_input[scaled_features] = scaler.transform(single_input_df[scaled_features])
+    processed_input = final_input_df.copy()
+    processed_input[scaled_features] = scaler.transform(final_input_df[scaled_features])
     
-    # Process prediction
+    # Process prediction + full probability distribution across all classes
     predicted_encoded_output = model.predict(processed_input)
+    class_probabilities = model.predict_proba(processed_input)[0]  # shape (n_classes,), order matches model.classes_
     
-    return int(predicted_encoded_output), accuracy
+    return int(predicted_encoded_output), accuracy, class_probabilities
