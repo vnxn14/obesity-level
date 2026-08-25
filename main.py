@@ -3,8 +3,9 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-from ANN import predict_ann
-from KNN import train_knn_model, predict_knn
+from ANN import get_trained_ann_model, predict_ann
+from KNN import get_trained_knn_model, predict_knn
+from DecisionTree import get_trained_decision_tree_model, predict_decision_tree
 
 # Page configurations
 st.set_page_config(page_title="Obesity Risk Predictor", layout="wide")
@@ -133,9 +134,22 @@ BMI_RANGES = {
     'Obesity Type III': '40.0 and above',
 }
 
-# Color spectrum matched to class order (blue -> green -> amber -> coral -> red)
+# Color spectrum matched to class order (blue -> green -> amber -> coral -> red).
+# 7 classes are grouped into 5 color bands: Insufficient=blue, Normal=green,
+# Overweight I/II=amber, Obesity I/II=coral, Obesity III=red.
 GAUGE_COLORS = ["#85B7EB", "#639922", "#BA7517", "#D85A30", "#A32D2D"]
-GAUGE_STOPS = [0, 20, 45, 70, 100]  # boundaries as % of the 0-100 axis
+# Boundaries sit at the midpoint between each color group's classes (classes are
+# spaced evenly at i/6*100 for i in 0..6), so len(GAUGE_STOPS)-1 == len(GAUGE_COLORS).
+GAUGE_STOPS = [0, 8, 25, 58, 92, 100]
+
+
+def get_band_color(position_pct: float) -> str:
+    """Returns the gauge color band a given position (0-100) falls into,
+    so other charts (e.g. the probability bar) can match the gauge's coloring."""
+    for i in range(len(GAUGE_STOPS) - 1):
+        if GAUGE_STOPS[i] <= position_pct <= GAUGE_STOPS[i + 1]:
+            return GAUGE_COLORS[i]
+    return GAUGE_COLORS[-1]
 
 
 def render_gauge(position_pct: float, label: str):
@@ -188,9 +202,10 @@ def render_gauge(position_pct: float, label: str):
     return fig
 
 
-def render_probability_bar(probs: np.ndarray, predicted_idx: int):
-    """Horizontal bar chart of per-class probabilities, predicted class highlighted."""
-    colors = ["#BA7517" if i == predicted_idx else "#d9d9d9" for i in range(len(CLASS_ORDER))]
+def render_probability_bar(probs: np.ndarray, predicted_idx: int, highlight_color: str):
+    """Horizontal bar chart of per-class probabilities, predicted class highlighted
+    in the same color as its band on the gauge above."""
+    colors = [highlight_color if i == predicted_idx else "#d9d9d9" for i in range(len(CLASS_ORDER))]
     fig = go.Figure(go.Bar(
         x=probs * 100,
         y=CLASS_ORDER,
@@ -229,6 +244,7 @@ def display_prediction_results(prediction_index: int, accuracy_score: float, pro
     Used by both the ANN and KNN branches so the two models render identically."""
     predicted_label = target_reverse_map.get(prediction_index, "Unknown Class")
     position_pct = (prediction_index / (len(CLASS_ORDER) - 1)) * 100
+    band_color = get_band_color(position_pct)
 
     # st.container(border=True) actually wraps everything placed inside it,
     # unlike two separate st.markdown('<div>') / st.markdown('</div>') calls.
@@ -252,7 +268,7 @@ def display_prediction_results(prediction_index: int, accuracy_score: float, pro
         if probabilities is not None:
             st.markdown('<p class="result-label">Probability by class</p>', unsafe_allow_html=True)
             st.plotly_chart(
-                render_probability_bar(np.asarray(probabilities), prediction_index),
+                render_probability_bar(np.asarray(probabilities), prediction_index, band_color),
                 use_container_width=True
             )
         else:
@@ -275,9 +291,22 @@ def display_prediction_results(prediction_index: int, accuracy_score: float, pro
 
 
 @st.cache_resource
-def get_trained_knn_model():
-    """Trains KNN once per session instead of on every button click."""
-    return train_knn_model()
+def get_ann_model_cached():
+    """Session-memory layer on top of ANN.py's joblib disk cache — avoids
+    even a disk read after the first call in this session."""
+    return get_trained_ann_model()
+
+
+@st.cache_resource
+def get_knn_model_cached():
+    """Session-memory layer on top of KNN.py's joblib disk cache."""
+    return get_trained_knn_model()
+
+
+@st.cache_resource
+def get_decision_tree_model_cached():
+    """Session-memory layer on top of DecisionTree.py's joblib disk cache."""
+    return get_trained_decision_tree_model()
 
 
 # --- 5. PREDICTION TRIGGERS ---
@@ -287,13 +316,8 @@ if st.button("Run", type="primary"):
     if selected_model == "ANN (Artificial Neural Network)":
         with st.spinner("Processing Artificial Neural Network..."):
             try:
-                result = predict_ann(input_df)
-
-                probabilities = None
-                if isinstance(result, tuple) and len(result) == 3:
-                    prediction_index, accuracy_score, probabilities = result
-                else:
-                    prediction_index, accuracy_score = result
+                model, scaler, expected_columns_order, accuracy_score = get_ann_model_cached()
+                prediction_index, probabilities = predict_ann(model, scaler, expected_columns_order, input_df)
 
                 display_prediction_results(prediction_index, accuracy_score, probabilities)
 
@@ -303,14 +327,22 @@ if st.button("Run", type="primary"):
     elif selected_model == "KNN (K-Nearest Neighbors)":
         with st.spinner("Processing K-Nearest Neighbors..."):
             try:
-                model, scaler, expected_columns_order, accuracy_score = get_trained_knn_model()
-                result = predict_knn(model, scaler, expected_columns_order, input_df)
+                model, scaler, expected_columns_order, accuracy_score = get_knn_model_cached()
+                prediction_index, probabilities = predict_knn(model, scaler, expected_columns_order, input_df)
 
-                probabilities = None
-                if isinstance(result, tuple) and len(result) == 2:
-                    prediction_index, probabilities = result
-                else:
-                    prediction_index = result
+                display_prediction_results(prediction_index, accuracy_score, probabilities)
+
+            except Exception as e:
+                st.error(f"An unexpected computational error occurred: {e}")
+
+    elif selected_model == "SVM (Support Vector Machine)":
+        st.warning("SVM model is currently under development and not yet available for predictions.")
+
+    elif selected_model == "Decision Tree":
+        with st.spinner("Processing Decision Tree..."):
+            try:
+                model, scaler, expected_columns_order, accuracy_score = get_decision_tree_model_cached()
+                prediction_index, probabilities = predict_decision_tree(model, scaler, expected_columns_order, input_df)
 
                 display_prediction_results(prediction_index, accuracy_score, probabilities)
 

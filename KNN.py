@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.neighbors import KNeighborsClassifier
 
 from data_loader import load_all_processed_data
+from model_cache import load_or_train
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +39,15 @@ def train_knn_model():
     accuracy = knn_model.score(X_test_scaled, y_test) * 100
 
     return knn_model, scaler, X_train_scaled.columns, accuracy
+
+
+def get_trained_knn_model():
+    """
+    Returns a cached (model, scaler, columns, accuracy) tuple. Loads it
+    from disk via joblib if a cached version already exists instead of
+    retraining — see model_cache.CACHE_VERSION to force a fresh retrain.
+    """
+    return load_or_train("knn", train_knn_model)
 
 
 def predict_knn(model, scaler, expected_columns_order, single_input_df):

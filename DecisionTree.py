@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.tree import DecisionTreeClassifier
 
 from data_loader import load_all_processed_data
+from model_cache import load_or_train
 
 
 # ---------------------------------------------------------------------------
@@ -45,6 +46,15 @@ def train_decision_tree_model():
     accuracy = decision_tree_model.score(X_test_scaled, y_test) * 100
 
     return decision_tree_model, scaler, X_train_scaled.columns, accuracy
+
+
+def get_trained_decision_tree_model():
+    """
+    Returns a cached (model, scaler, columns, accuracy) tuple. Loads it
+    from disk via joblib if a cached version already exists instead of
+    retraining — see model_cache.CACHE_VERSION to force a fresh retrain.
+    """
+    return load_or_train("decision_tree", train_decision_tree_model)
 
 
 def predict_decision_tree(model, scaler, expected_columns_order, single_input_df):
