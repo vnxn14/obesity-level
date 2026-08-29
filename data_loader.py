@@ -74,7 +74,8 @@ def load_all_processed_data():
         df_clean[bool_cols] = df_clean[bool_cols].astype(int)
 
     # --- 7. FEATURE EXTRACTION & ISOLATION ---
-    X = df_clean.drop(columns=['Obesity_Level', 'Obesity_Level_Encoded'])
+    # In Section 7, explicitly drop BMI along with the targets
+    X = df_clean.drop(columns=['Obesity_Level', 'Obesity_Level_Encoded', 'BMI'])
     y = df_clean['Obesity_Level_Encoded']
 
     # --- 8. TRAIN TEST SPLITTING ---
@@ -86,8 +87,8 @@ def load_all_processed_data():
     scaler = StandardScaler()
     scaled_features = [
         'Age', 'Height', 'Weight', 'Veg_Consumption',
-        'Num_Main_Meals', 'Water_Intake', 'Physical_Activity', 
-        'Tech_Usage_Time', 'BMI'
+        'Num_Main_Meals', 'Water_Intake', 'Physical_Activity',
+        'Tech_Usage_Time', 'Food_Between_Meals', 'Alcohol_Intake'
     ]
 
     # Avoid modifications over slice memory references by copying explicitly

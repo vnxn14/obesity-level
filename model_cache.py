@@ -8,7 +8,7 @@ CACHE_DIR = "model_cache"
 # invalidates every existing pickle and forces a clean retrain on next run —
 # without needing to know the internals of data_loader.py to detect the
 # change automatically.
-CACHE_VERSION = "v1"
+CACHE_VERSION = "v7"
 
 
 def load_or_train(model_name: str, train_fn):
