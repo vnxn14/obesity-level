@@ -215,51 +215,81 @@ def evaluate_classifier(model, X_test, y_test):
     return accuracy, precision, recall, f1, roc_auc, cm
 
 
-def visualize_dataset_analysis():
-    """
-    Run this function independently in an isolated script execution block
-    to render your data profile plots on your desktop screen.
-    """
-    # Fresh temporary load to construct pristine data distributions
-    df = pd.read_csv('ObesityDataSet_raw_and_data_sinthetic.csv')
-    
-    # Graph 1: Missing Values
-    plt.figure(figsize=(10, 5))
-    sns.heatmap(df.isnull(), cbar=False, cmap="viridis", yticklabels=False)
-    plt.title("Data Inspection: Missing Values Heatmap")
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
-    plt.show()
+def missing_values_heatmap_chart(df):
+    """Missing-values heatmap on the RAW dataset (before any preprocessing)."""
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.heatmap(df.isnull(), cbar=False, cmap="viridis", yticklabels=False, ax=ax)
+    ax.set_title("Data Inspection: Missing Values Heatmap")
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+    fig.tight_layout()
+    return fig
 
-    # Graph 2: Duplicates Bar Chart
+
+def duplicates_bar_chart(df):
+    """Unique vs duplicate row counts on the RAW dataset (before de-duplication)."""
     duplicate_count = df.duplicated().sum()
     total_rows = len(df)
-    plt.figure(figsize=(6, 4))
-    sns.barplot(x=["Unique Rows", "Duplicate Rows"], y=[total_rows - duplicate_count, duplicate_count], palette=["#4CAF50", "#FF5252"])
-    plt.title(f"Data Inspection: Duplicate Rows (Found {duplicate_count})")
-    plt.ylabel("Number of Rows")
-    plt.tight_layout()
-    plt.show()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.barplot(
+        x=["Unique Rows", "Duplicate Rows"],
+        y=[total_rows - duplicate_count, duplicate_count],
+        palette=["#4CAF50", "#FF5252"],
+        ax=ax,
+    )
+    ax.set_title(f"Data Inspection: Duplicate Rows (Found {duplicate_count})")
+    ax.set_ylabel("Number of Rows")
+    fig.tight_layout()
+    return fig
 
-    # Graph 3: Before vs After Scaling Curve Distributions
-    # (Re-running a swift, local pipeline copy to isolate scaled features cleanly)
-    rename_dict = {"family_history_with_overweight": "Family_History_Overweight", "FAVC": "High_Caloric_Food_Freq", "FCVC": "Vegetable_Consumption_Freq", "NCP": "Main_Meals_Per_Day", "CAEC": "Food_Between_Meals", "CH2O": "Water_Intake_Daily", "SCC": "Calories_Monitoring", "FAF": "Physical_Activity_Freq", "TUE": "Tech_Device_Usage_Time", "CALC": "Alcohol_Consumption", "MTRANS": "Transportation_Method", "NObeyesdad": "Obesity_Level"}
+
+def scaling_before_after_chart(df):
+    """
+    KDE distributions of Weight/Height/Age before vs after StandardScaler.
+    Runs its own local rename + encode + scale copy purely for visualization —
+    this scaler is independent of the one used in load_all_processed_data().
+    """
+    rename_dict = {
+        "family_history_with_overweight": "Family_History_Overweight",
+        "FAVC": "High_Caloric_Food_Freq",
+        "FCVC": "Vegetable_Consumption_Freq",
+        "NCP": "Main_Meals_Per_Day",
+        "CAEC": "Food_Between_Meals",
+        "CH2O": "Water_Intake_Daily",
+        "SCC": "Calories_Monitoring",
+        "FAF": "Physical_Activity_Freq",
+        "TUE": "Tech_Device_Usage_Time",
+        "CALC": "Alcohol_Consumption",
+        "MTRANS": "Transportation_Method",
+        "NObeyesdad": "Obesity_Level",
+    }
     df = df.rename(columns=rename_dict).drop_duplicates()
-    
-    integer_attributes = ["Vegetable_Consumption_Freq", "Main_Meals_Per_Day", "Water_Intake_Daily", "Physical_Activity_Freq", "Tech_Device_Usage_Time", "Age"]
-    for col in integer_attributes: df[col] = df[col].round().astype(int)
+
+    integer_attributes = [
+        "Vegetable_Consumption_Freq", "Main_Meals_Per_Day", "Water_Intake_Daily",
+        "Physical_Activity_Freq", "Tech_Device_Usage_Time", "Age",
+    ]
+    for col in integer_attributes:
+        df[col] = df[col].round().astype(int)
     df["Height"], df["Weight"] = df["Height"].round(2), df["Weight"].round(2)
-    
+
     habit_mapping = {"no": 0, "Sometimes": 1, "Frequently": 2, "Always": 3}
     df["Alcohol_Consumption"] = df["Alcohol_Consumption"].map(habit_mapping)
     df["Food_Between_Meals"] = df["Food_Between_Meals"].map(habit_mapping)
     df["Gender"] = df["Gender"].map({"Female": 0, "Male": 1})
 
-    X_temp = pd.get_dummies(df.drop(columns=["Obesity_Level"]), columns=["Family_History_Overweight", "High_Caloric_Food_Freq", "Calories_Monitoring", "Transportation_Method", "SMOKE"], drop_first=True)
-    
+    X_temp = pd.get_dummies(
+        df.drop(columns=["Obesity_Level"]),
+        columns=["Family_History_Overweight", "High_Caloric_Food_Freq", "Calories_Monitoring", "Transportation_Method", "SMOKE"],
+        drop_first=True,
+    )
+
     scaler = StandardScaler()
-    numerical_cols = ["Age", "Height", "Weight", "Vegetable_Consumption_Freq", "Main_Meals_Per_Day", "Water_Intake_Daily", "Physical_Activity_Freq", "Tech_Device_Usage_Time", "Alcohol_Consumption", "Food_Between_Meals"]
-    
+    numerical_cols = [
+        "Age", "Height", "Weight", "Vegetable_Consumption_Freq", "Main_Meals_Per_Day",
+        "Water_Intake_Daily", "Physical_Activity_Freq", "Tech_Device_Usage_Time",
+        "Alcohol_Consumption", "Food_Between_Meals",
+    ]
+
     X_scaled_temp = X_temp.copy()
     X_scaled_temp[numerical_cols] = scaler.fit_transform(X_scaled_temp[numerical_cols])
 
@@ -277,5 +307,38 @@ def visualize_dataset_analysis():
     sns.kdeplot(X_scaled_temp['Age'], ax=ax2, color='g', label='Age')
     ax2.set_xlabel('Standardized Z-Score Unit Scale (-3 to +3)')
     ax2.legend()
-    plt.tight_layout()
+    fig.tight_layout()
+    return fig
+
+
+def correlation_heatmap_chart(df):
+    """
+    Correlation heatmap on the RAW dataset's already-numeric columns
+    (Age, Height, Weight, FCVC, NCP, CH2O, FAF, TUE) — computed BEFORE any
+    renaming, encoding, or scaling. Categorical raw columns (Gender, MTRANS,
+    CALC, CAEC, SMOKE, family_history_with_overweight, FAVC, SCC) are excluded
+    here since numeric_only=True drops them at this stage.
+    """
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(df.corr(numeric_only=True), annot=True, cmap="coolwarm", ax=ax)
+    ax.set_title("Feature Correlation Heatmap (Raw Numeric Features)")
+    fig.tight_layout()
+    return fig
+
+
+def visualize_dataset_analysis():
+    """
+    Run this function independently in an isolated script execution block
+    to render your data profile plots on your desktop screen.
+    """
+    # Fresh temporary load to construct pristine data distributions
+    df = pd.read_csv('ObesityDataSet_raw_and_data_sinthetic.csv')
+
+    missing_values_heatmap_chart(df)
+    plt.show()
+
+    duplicates_bar_chart(df)
+    plt.show()
+
+    scaling_before_after_chart(df)
     plt.show()

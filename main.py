@@ -10,6 +10,35 @@ from KNN import get_trained_knn_model, predict_knn
 from DecisionTree import get_trained_decision_tree_model, predict_decision_tree
 from SVM import get_trained_svm_model, predict_svm
 
+from chartI_univariate import (
+    obesity_level_chart,
+    transportation_chart,
+    weight_chart,
+    height_chart,
+)
+from chartII_bivariate import (
+    physical_activity_chart,
+    technology_usage_chart,
+    vegetable_consumption_chart,
+    water_consumption_chart,
+    high_calorie_food_chart,
+)
+from chartIII_multivariate import (
+    insufficient_weight_chart,
+    normal_weight_chart,
+    obesity_type_i_chart,
+    obesity_type_ii_chart,
+    obesity_type_iii_chart,
+    overweight_level_i_chart,
+    overweight_level_ii_chart,
+)
+from data_loader import (
+    missing_values_heatmap_chart,
+    duplicates_bar_chart,
+    scaling_before_after_chart,
+    correlation_heatmap_chart,
+)
+
 # Page configurations
 st.set_page_config(page_title="Obesity Risk Predictor", page_icon="🏋️", layout="wide")
 st.title("🏋️‍♂️ Multi-Model Obesity Risk Prediction Dashboard")
@@ -124,6 +153,44 @@ TRANSPORT_MODES = [
 if "transport_mode" not in st.session_state:
     st.session_state.transport_mode = "Automobile"
 
+
+@st.cache_data(show_spinner=False)
+def load_raw_obesity_dataset():
+    """Raw dataset, unrenamed/unencoded — this is the shape chartI/II/III expect."""
+    return pd.read_csv("ObesityDataSet_raw_and_data_sinthetic.csv")
+
+
+EDA_CHART_CATEGORIES = {
+    "📊 Univariate": {
+        "Obesity Level Distribution": obesity_level_chart,
+        "Transportation Method Distribution": transportation_chart,
+        "Weight Distribution": weight_chart,
+        "Height Distribution": height_chart,
+    },
+    "🔗 Bivariate": {
+        "Physical Activity vs Obesity Level": physical_activity_chart,
+        "Technology Usage vs Obesity Level": technology_usage_chart,
+        "Vegetable Consumption vs Obesity Level": vegetable_consumption_chart,
+        "Water Consumption vs Obesity Level": water_consumption_chart,
+        "High-Calorie Food Consumption vs Obesity Level": high_calorie_food_chart,
+    },
+    "🕸️ Multivariate (Lifestyle Profile)": {
+        "Insufficient Weight": insufficient_weight_chart,
+        "Normal Weight": normal_weight_chart,
+        "Obesity Type I": obesity_type_i_chart,
+        "Obesity Type II": obesity_type_ii_chart,
+        "Obesity Type III": obesity_type_iii_chart,
+        "Overweight Level I": overweight_level_i_chart,
+        "Overweight Level II": overweight_level_ii_chart,
+    },
+    "🧹 Data Preprocessing": {
+        "Missing Values Heatmap": missing_values_heatmap_chart,
+        "Duplicate Rows": duplicates_bar_chart,
+        "Feature Scaling (Before vs After)": scaling_before_after_chart,
+        "Feature Correlation Heatmap (Raw Numeric)": correlation_heatmap_chart,
+    },
+}
+
 # --- GAUGE / VISUAL HELPERS ---
 def calculate_gauge_position(predicted_idx: int) -> float:
     idx = int(np.clip(predicted_idx, 0, len(GAUGE_COLORS) - 1))
@@ -185,36 +252,53 @@ def get_all_model_metrics():
     return metrics
 
 
-def render_radar_comparison(metrics: dict):
-    """Overlaid radar/spider chart comparing all models across 5 metrics."""
+def render_3d_bar_comparison(metrics: dict):
+    """
+    Real interactive 3D bar chart (rotatable/zoomable) comparing all models
+    across 5 metrics. Each bar is a Mesh3d cuboid: metric on one axis,
+    model on the other, score (%) as height.
+    """
     categories = ["Accuracy", "Precision", "Recall", "F1-Score", "ROC-AUC"]
-    palette = ["#3498db", "#2ecc71", "#e67e22", "#9b59b6"]
+    models = list(metrics.keys())
+    palette = ["#2ec4b6", "#8ac926", "#5865f2", "#ff6f59", "#f4a261", "#e63946"]
+    bar_half_w = 0.32
 
     fig = go.Figure()
-    for i, (model_name, scores) in enumerate(metrics.items()):
-        values = [scores[c] * 100 for c in categories]
-        values.append(values[0])  # close the loop
-        color = palette[i % len(palette)]
-        fig.add_trace(go.Scatterpolar(
-            r=values,
-            theta=categories + categories[:1],
-            name=model_name,
-            line=dict(color=color, width=2.5),
-            fillcolor=_hex_to_rgba(color, 0.30),
-            fill="toself",
-            hovertemplate="%{theta}: %{r:.1f}%<extra>" + model_name + "</extra>",
-        ))
+    for mi, model_name in enumerate(models):
+        color = palette[mi % len(palette)]
+        for ci, cat in enumerate(categories):
+            val = max(metrics[model_name][cat] * 100, 0.5)
+            x0, x1 = ci - bar_half_w, ci + bar_half_w
+            y0, y1 = mi - bar_half_w, mi + bar_half_w
+            z0, z1 = 0, val
+            fig.add_trace(go.Mesh3d(
+                x=[x0, x1, x1, x0, x0, x1, x1, x0],
+                y=[y0, y0, y1, y1, y0, y0, y1, y1],
+                z=[z0, z0, z0, z0, z1, z1, z1, z1],
+                alphahull=0,
+                color=color,
+                opacity=0.93,
+                flatshading=True,
+                name=model_name,
+                legendgroup=model_name,
+                showlegend=(ci == 0),
+                hovertext=f"<b>{model_name}</b><br>{cat}: {val:.1f}%",
+                hoverinfo="text",
+            ))
 
     fig.update_layout(
-        polar=dict(
-            bgcolor="white",
-            radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%", gridcolor="#e9ecef"),
-            angularaxis=dict(gridcolor="#e9ecef"),
+        scene=dict(
+            xaxis=dict(title="", tickvals=list(range(len(categories))), ticktext=categories, gridcolor="#e9ecef"),
+            yaxis=dict(title="", tickvals=list(range(len(models))), ticktext=models, gridcolor="#e9ecef"),
+            zaxis=dict(title="Score (%)", range=[0, 105], gridcolor="#e9ecef"),
+            camera=dict(eye=dict(x=1.7, y=1.7, z=1.1)),
+            aspectmode="manual",
+            aspectratio=dict(x=1.4, y=1.0, z=0.8),
         ),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
-        height=540,
-        margin=dict(l=60, r=60, t=40, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.05, xanchor="center", x=0.5),
+        height=580,
+        margin=dict(l=0, r=0, t=20, b=0),
         paper_bgcolor="white",
     )
     return fig
@@ -413,16 +497,49 @@ with main_input_col:
     input_df = pd.DataFrame([raw_input_data])
 
 with main_output_col:
-    view_tab1, view_tab3, view_tab4 = st.tabs(
-        ["🔵 Live Assessment", "📊 Confusion Matrix Analytics", "🏆 Model Comparison"]
+    view_tab1, view_tab3, view_tab4, view_tab5 = st.tabs(
+        ["🔵 Live Assessment", "📊 Confusion Matrix Analytics", "🏆 Model Comparison", "📈 Exploratory Charts"]
     )
 
+    with view_tab5:
+        st.subheader("📈 Exploratory Data Analysis")
+        st.caption("Excel-style 3D charts generated directly from the raw dataset.")
+
+        eda_col1, eda_col2 = st.columns(2)
+        with eda_col1:
+            eda_category = st.selectbox("Chart Category", list(EDA_CHART_CATEGORIES.keys()), key="eda_category")
+        feature_map = EDA_CHART_CATEGORIES[eda_category]
+        with eda_col2:
+            eda_feature = st.selectbox("Feature / View", list(feature_map.keys()), key="eda_feature")
+
+        with st.spinner("Rendering chart..."):
+            raw_ods = load_raw_obesity_dataset()
+            eda_fig = feature_map[eda_feature](raw_ods)
+        st.pyplot(eda_fig, use_container_width=True)
+
     with view_tab4:
-        st.subheader("🏆 Model Comparison — Radar View")
+        st.subheader("🏆 Model Comparison")
         st.caption("All four models plotted on the same 5 metrics (as %). Pulled from cache, so switching tabs doesn't retrain anything.")
         with st.spinner("Loading cached metrics for all models..."):
             all_metrics = get_all_model_metrics()
-        st.plotly_chart(render_radar_comparison(all_metrics), use_container_width=True)
+
+        accuracy_scores = {m: float(v["Accuracy"] * 100) for m, v in all_metrics.items()}
+        top_model = max(accuracy_scores, key=accuracy_scores.get)
+
+        s_col1, s_col2, s_col3 = st.columns(3)
+        with s_col1:
+            metric_card("Top Performer", f"{top_model} ({accuracy_scores[top_model]:.1f}%)")
+        with s_col2:
+            metric_card("Models Compared", str(len(all_metrics)))
+        with s_col3:
+            metric_card("Metric Scope", "Multi-Class (7 categories)")
+
+        st.write("")
+        chart_style = st.radio(
+            "Chart style", ["🧊 Isometric 3D"], horizontal=True, label_visibility="collapsed"
+        )
+        st.caption("Drag to rotate • scroll to zoom • hover a bar for its exact value")
+        st.plotly_chart(render_3d_bar_comparison(all_metrics), use_container_width=True)
 
         comparison_df = pd.DataFrame(all_metrics).T
         comparison_df = comparison_df[["Accuracy", "Precision", "Recall", "F1-Score", "ROC-AUC"]]
@@ -491,12 +608,12 @@ with main_output_col:
             with h_col1:
                 metric_card("Accuracy", f"{accuracy_score:.1f}%")
             with h_col2:
-                metric_card("Precision", f"{precision_score_val:.3f}")
+                metric_card("Precision", f"{precision_score_val:.2f}")
             with h_col3:
-                metric_card("Recall", f"{recall_score_val:.3f}")
+                metric_card("Recall", f"{recall_score_val:.2f}")
             with h_col4:
-                metric_card("F1-Score", f"{f1_score_val:.3f}")
+                metric_card("F1-Score", f"{f1_score_val:.2f}")
             with h_col5:
-                metric_card("ROC-AUC", f"{roc_auc_val:.3f}")
+                metric_card("ROC-AUC", f"{roc_auc_val:.2f}")
             st.write("")
             st.markdown(generate_html_confusion_matrix(actual_cm_array), unsafe_allow_html=True)

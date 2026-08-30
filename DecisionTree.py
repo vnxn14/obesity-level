@@ -21,11 +21,19 @@ def train_decision_tree_model():
     # Capture the exact structural column index directly from X_train_scaled
     trained_column_order = X_train_scaled.columns
 
-    decision_tree_model = DecisionTreeClassifier(criterion="gini", random_state=42)
+    # Added structural pre-pruning constraints to combat overfitting
+    decision_tree_model = DecisionTreeClassifier(
+        criterion="gini",
+        max_depth=8,              # Limits the maximum breakdown depth layers
+        min_samples_split=10,      # Requires at least 10 samples to create a new split node
+        min_samples_leaf=4,        # Each terminal leaf must contain at least 4 samples
+        random_state=42
+    )
     decision_tree_model.fit(X_train_scaled, y_train)
 
     accuracy, precision, recall, f1, roc_auc, cm = evaluate_classifier(decision_tree_model, X_test_scaled, y_test)
     return decision_tree_model, scaler, trained_column_order, accuracy, precision, recall, f1, roc_auc, cm
+
 
 
 def get_trained_decision_tree_model():

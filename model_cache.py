@@ -3,8 +3,7 @@ import joblib
 
 CACHE_DIR = "model_cache"
 
-# Bumped version string to v10 to clear old files and enforce 9-value structure
-CACHE_VERSION = "v10"
+CACHE_VERSION = "v12"
 
 
 def load_or_train(model_name: str, train_fn):
