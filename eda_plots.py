@@ -1,8 +1,12 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from data_loader import visualize_dataset_analysis
 
 df = pd.read_csv("ObesityDataSet_raw_and_data_sinthetic.csv")
+
+# missing values and duplicates checking, before and after feature scaling graphs
+visualize_dataset_analysis()
 
 # ==========================================
 # PLOT 1: Feature Correlation Heatmap

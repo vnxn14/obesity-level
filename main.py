@@ -206,27 +206,10 @@ def reorder_probabilities(model, probabilities):
 
     return ordered_probs
 
-def calculate_gauge_position(probs):
-    probs = np.asarray(probs, dtype=float)
-
-    # Normalize probabilities
-    total = probs.sum()
-
-    if total <= 0:
-        return 50.0
-
-    probs = probs / total
-
-    # Gauge category centers
-    centers = np.array([
-        (GAUGE_STOPS[i] + GAUGE_STOPS[i + 1]) / 2
-        for i in range(len(GAUGE_STOPS) - 1)
-    ])
-
-    # Weighted average of category positions
-    position = np.dot(probs, centers)
-
-    return float(np.clip(position, 0, 100))
+def calculate_gauge_position(predicted_idx: int) -> float:
+    """Place the needle in the center of the predicted class color band."""
+    idx = int(np.clip(predicted_idx, 0, len(GAUGE_COLORS) - 1))
+    return (GAUGE_STOPS[idx] + GAUGE_STOPS[idx + 1]) / 2
 
 def render_gauge(position_pct: float, label: str):
     fig = go.Figure()
@@ -316,24 +299,26 @@ with main_input_col:
         alcohol = st.selectbox("Alcohol Intake Frequency?", ["No", "Sometimes", "Frequently", "Always"])
         transport = st.selectbox("Primary Transportation Mode", ["Automobile", "Bike", "Motorbike", "Public_Transportation", "Walking"])
 
-    # Feature engineering compilation
+    # Feature vector using the same pre-dummy column names as data_loader.py
     raw_input_data = {
-        'Gender': 1 if gender.lower() == 'male' else 0,
-        'Age': int(np.round(age, 0)), 'Height': round(height, 2), 'Weight': round(weight, 1),
-        'Family_History': 1 if family_history.lower() == 'yes' else 0,
-        'High_Caloric_Food': 1 if high_caloric.lower() == 'yes' else 0,
-        'Veg_Consumption': round(veg_cons, 2), 
-        'Num_Main_Meals': round(main_meals, 2),
-        'Food_Between_Meals': {'no': 0, 'sometimes': 1, 'frequently': 2, 'always': 3}[food_between.lower()],
-        'SMOKE': 1 if smoke_status.lower() == 'yes' else 0, 
-        'Water_Intake': round(water, 2),
-        'Calorie_Monitoring': 1 if calorie_mon.lower() == 'yes' else 0, 
-        'Physical_Activity': round(phys_act, 2),
-        'Tech_Usage_Time': round(tech_usage, 2), 
-        'Alcohol_Intake': {'no': 0, 'sometimes': 1, 'frequently': 2, 'always': 3}[alcohol.lower()]}
+        "Gender": gender,
+        "Age": age,
+        "Height": height,
+        "Weight": weight,
+        "Family_History_Overweight": family_history.lower(),
+        "High_Caloric_Food_Freq": high_caloric.lower(),
+        "Vegetable_Consumption_Freq": veg_cons,
+        "Main_Meals_Per_Day": main_meals,
+        "Food_Between_Meals": food_between,
+        "SMOKE": smoke_status.lower(),
+        "Water_Intake_Daily": water,
+        "Calories_Monitoring": calorie_mon.lower(),
+        "Physical_Activity_Freq": phys_act,
+        "Tech_Device_Usage_Time": tech_usage,
+        "Alcohol_Consumption": alcohol,
+        "Transportation_Method": transport,
+    }
     calculated_bmi = round(weight / (height ** 2), 2)
-    for mode in ['Automobile', 'Bike', 'Motorbike', 'Public_Transportation', 'Walking']:
-        raw_input_data[f"MTRANS_{mode}"] = 1 if transport.lower() == mode.lower() else 0
     input_df = pd.DataFrame([raw_input_data])
 # ==========================================
 # LEFT COLUMN: THE TOGGLE TABS (PREDICTION VS MATRIX)
@@ -384,16 +369,20 @@ with main_output_col:
         if hasattr(probabilities, "ndim") and probabilities.ndim > 1:
             probabilities = probabilities[0]
 
-        probs_array = np.asarray(probabilities)
-        corrected_prediction_idx = int(np.argmax(probs_array))
-        predicted_label = MATRIX_LABELS[corrected_prediction_idx]
+        probs_array = np.asarray(probabilities, dtype=float)
+        predicted_idx = int(prediction_index)
+        if predicted_idx < 0 or predicted_idx >= len(MATRIX_LABELS):
+            predicted_idx = int(np.argmax(probs_array))
+        predicted_label = MATRIX_LABELS[predicted_idx]
 
-        position_pct = calculate_gauge_position(probs_array)
+        position_pct = calculate_gauge_position(predicted_idx)
 
-        band_color = GAUGE_COLORS[corrected_prediction_idx]
+        band_color = GAUGE_COLORS[predicted_idx]
 
         prediction_confidence = (
-            probs_array[corrected_prediction_idx] * 100
+            probs_array[predicted_idx] * 100
+            if predicted_idx < len(probs_array)
+            else 0.0
         )
         with st.container(border=True):
             m_col1, m_col2, m_col3 = st.columns(3)
@@ -408,7 +397,7 @@ with main_output_col:
                 st.markdown(f'<p class="result-value">{calculated_bmi:.2f}</p>', unsafe_allow_html=True)
             st.plotly_chart(render_gauge(position_pct, predicted_label), use_container_width=True)
             st.markdown('<p class="result-label">Probability Distribution Profile</p>', unsafe_allow_html=True)
-            st.plotly_chart(render_probability_bar(probs_array, corrected_prediction_idx, band_color), use_container_width=True)
+            st.plotly_chart(render_probability_bar(probs_array, predicted_idx, band_color), use_container_width=True)
     # ------------------ TAB 2: CONFUSION MATRIX VIEWER ------------------
     with view_tab2:
         st.subheader("🎯 Evaluation Performance Metrics")

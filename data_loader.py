@@ -1,103 +1,279 @@
+import matplotlib.pyplot as plt
 import pandas as pd
-import numpy as np
-import streamlit as st
-from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
-@st.cache_data
+# Expose target_mapping universally so main.py can use it for labels
+target_mapping = {
+    "Insufficient_Weight": 0,
+    "Normal_Weight": 1,
+    "Overweight_Level_I": 2,
+    "Overweight_Level_II": 3,
+    "Obesity_Type_I": 4,
+    "Obesity_Type_II": 5,
+    "Obesity_Type_III": 6,
+}
+
+CLASS_LABELS = list(range(len(target_mapping)))
+
+GENDER_MAPPING = {"Female": 0, "Male": 1}
+HABIT_MAPPING = {"no": 0, "Sometimes": 1, "Frequently": 2, "Always": 3}
+
+CATEGORICAL_COLS = [
+    "Family_History_Overweight",
+    "High_Caloric_Food_Freq",
+    "Calories_Monitoring",
+    "Transportation_Method",
+    "SMOKE",
+]
+
+NUMERICAL_COLS = [
+    "Age",
+    "Height",
+    "Weight",
+    "Vegetable_Consumption_Freq",
+    "Main_Meals_Per_Day",
+    "Water_Intake_Daily",
+    "Physical_Activity_Freq",
+    "Tech_Device_Usage_Time",
+    "Alcohol_Consumption",
+    "Food_Between_Meals",
+]
+
+YES_NO_COLS = [
+    "Family_History_Overweight",
+    "High_Caloric_Food_Freq",
+    "Calories_Monitoring",
+    "SMOKE",
+]
+
+
 def load_all_processed_data():
-
-    # --- 1. LOAD DATA ---
+    """
+    Loads, cleans, splits, encodes, and scales the dataset in memory.
+    This function contains ZERO blocking UI popup loops.
+    """
+    # 1. Load data
     df = pd.read_csv('ObesityDataSet_raw_and_data_sinthetic.csv')
 
-    # --- 2. DEDUPLICATION ---
-    df_clean = df.drop_duplicates()
-
-    # --- 3. COLUMN RENAMING & TEXT CLEANING ---
-    column_rename_map = {
-        'family_history_with_overweight': 'Family_History', 'FAVC': 'High_Caloric_Food',
-        'FCVC': 'Veg_Consumption', 'NCP': 'Num_Main_Meals', 'CAEC': 'Food_Between_Meals',
-        'CH2O': 'Water_Intake', 'SCC': 'Calorie_Monitoring', 'FAF': 'Physical_Activity',
-        'TUE': 'Tech_Usage_Time', 'CALC': 'Alcohol_Intake', 'MTRANS': 'Transport_Mode',
-        'NObeyesdad': 'Obesity_Level'
+    # 2. Rename columns
+    rename_dict = {
+        "family_history_with_overweight": "Family_History_Overweight",
+        "FAVC": "High_Caloric_Food_Freq",
+        "FCVC": "Vegetable_Consumption_Freq",
+        "NCP": "Main_Meals_Per_Day",
+        "CAEC": "Food_Between_Meals",
+        "CH2O": "Water_Intake_Daily",
+        "SCC": "Calories_Monitoring",
+        "FAF": "Physical_Activity_Freq",
+        "TUE": "Tech_Device_Usage_Time",
+        "CALC": "Alcohol_Consumption",
+        "MTRANS": "Transportation_Method",
+        "NObeyesdad": "Obesity_Level", 
     }
-    df_clean = df_clean.rename(columns=column_rename_map)
+    df = df.rename(columns=rename_dict)
 
-    text_columns = ['Gender', 'Family_History', 'High_Caloric_Food', 'SMOKE',
-                    'Calorie_Monitoring', 'Food_Between_Meals', 'Alcohol_Intake', 'Transport_Mode']
-    for col in text_columns:
-        if col in df_clean.columns and df_clean[col].dtype == 'object':
-            df_clean[col] = df_clean[col].str.strip().str.lower()
+    # 3. Drop exact duplicates
+    if df.duplicated().sum() > 0:
+        df = df.drop_duplicates().reset_index(drop=True)
 
-    # --- 4. DATA TYPE CONVERSION & ACCURACY FIXES ---
-    df_clean['Age'] = df_clean['Age'].round(0).astype(int)
-    df_clean['Height'] = df_clean['Height'].round(2)
-    df_clean['Weight'] = df_clean['Weight'].round(1)
+    # 4. Custom binary & ordinal mappings
+    df["Gender"] = df["Gender"].map(GENDER_MAPPING)
+    df["Alcohol_Consumption"] = df["Alcohol_Consumption"].map(HABIT_MAPPING)
+    df["Food_Between_Meals"] = df["Food_Between_Meals"].map(HABIT_MAPPING)
 
-    behavioral_cols = ['Veg_Consumption', 'Num_Main_Meals', 'Water_Intake', 'Physical_Activity', 'Tech_Usage_Time']
-    df_clean[behavioral_cols] = df_clean[behavioral_cols].round(2)
+    # 5. Isolate target
+    X = df.drop(columns=["Obesity_Level"])
+    y = df["Obesity_Level"].map(target_mapping)
 
-    # --- 5. FEATURE ENGINEERING ---
-    df_clean['BMI'] = (df_clean['Weight'] / (df_clean['Height'] ** 2)).round(2)
-
-    # --- 6. CATEGORICAL ENCODING ---
-    # Binary Mappings
-    binary_map = {'yes': 1, 'no': 0, 'male': 1, 'female': 0}
-    binary_cols = ['Gender', 'Family_History', 'High_Caloric_Food', 'SMOKE', 'Calorie_Monitoring']
-    for col in binary_cols:
-        df_clean[col] = df_clean[col].map(binary_map).astype(int)
-
-    # Ordinal Mappings
-    ordinal_map = {'no': 0, 'sometimes': 1, 'frequently': 2, 'always': 3}
-    df_clean['Food_Between_Meals'] = df_clean['Food_Between_Meals'].replace(ordinal_map).astype(int)
-    df_clean['Alcohol_Intake'] = df_clean['Alcohol_Intake'].replace(ordinal_map).astype(int)
-
-    # Target Label Encodings
-    target_map = {
-        'Insufficient_Weight': 0, 
-        'Normal_Weight': 1,
-        'Overweight_Level_I': 2,
-        'Overweight_Level_II': 3,
-        'Obesity_Type_I': 4,
-        'Obesity_Type_II': 5,
-        'Obesity_Type_III': 6
-    }
-    df_clean['Obesity_Level_Encoded'] = df_clean['Obesity_Level'].map(target_map)
-
-    # Nominal One-Hot Encoding
-    if 'Transport_Mode' in df_clean.columns:
-        df_clean = pd.get_dummies(df_clean, columns=['Transport_Mode'], prefix='MTRANS', dtype=int)
-
-    # Clean residual booleans to integers
-    bool_cols = df_clean.select_dtypes(include='bool').columns
-    if len(bool_cols) > 0:
-        df_clean[bool_cols] = df_clean[bool_cols].astype(int)
-
-    # --- 7. FEATURE EXTRACTION & ISOLATION ---
-    # In Section 7, explicitly drop BMI along with the targets
-    X = df_clean.drop(columns=['Obesity_Level', 'Obesity_Level_Encoded', 'BMI'])
-    y = df_clean['Obesity_Level_Encoded']
-
-    # --- 8. TRAIN TEST SPLITTING ---
+    # 6. Train-Test Split (80/20 with stratification)
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.20, random_state=42, stratify=y
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # --- 9. FEATURE SCALING ---
+    # 7. One-Hot Encoding (fit categories on train only, then align test)
+    X_train_encoded = pd.get_dummies(X_train, columns=CATEGORICAL_COLS, drop_first=True)
+    X_test_encoded = pd.get_dummies(X_test, columns=CATEGORICAL_COLS, drop_first=True)
+
+    X_train_encoded, X_test_encoded = X_train_encoded.align(
+        X_test_encoded, join="left", axis=1, fill_value=0
+    )
+
+    # 8. Feature Scaling (fit on train numerical columns only)
     scaler = StandardScaler()
-    scaled_features = [
-        'Age', 'Height', 'Weight', 'Veg_Consumption',
-        'Num_Main_Meals', 'Water_Intake', 'Physical_Activity',
-        'Tech_Usage_Time', 'Food_Between_Meals', 'Alcohol_Intake'
-    ]
+    X_train_scaled = X_train_encoded.copy()
+    X_test_scaled = X_test_encoded.copy()
 
-    # Avoid modifications over slice memory references by copying explicitly
-    X_train_scaled = X_train.copy()
-    X_test_scaled = X_test.copy()
+    X_train_scaled[NUMERICAL_COLS] = scaler.fit_transform(X_train_scaled[NUMERICAL_COLS])
+    X_test_scaled[NUMERICAL_COLS] = scaler.transform(X_test_scaled[NUMERICAL_COLS])
 
-    # Fit transformations accurately matching cross-validation boundaries
-    X_train_scaled[scaled_features] = scaler.fit_transform(X_train[scaled_features])
-    X_test_scaled[scaled_features] = scaler.transform(X_test[scaled_features])
+    # Export your unscaled test tracking csv automatically right before returning variables
+    test_export = X_test_encoded.copy()
+    test_export["Obesity_Level"] = y_test.values
+    test_export.to_csv("obesity_test_inputs_unscaled.csv", index=False)
 
-    # Return exactly what your pipeline layout needs
     return X_train_scaled, X_test_scaled, y_train, y_test, scaler, X
+
+
+def _to_yes_no(value):
+    if pd.isna(value):
+        return "no"
+    if isinstance(value, str):
+        return value.strip().lower()
+    return "yes" if int(value) == 1 else "no"
+
+
+def _to_habit(value):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return int(value)
+    key = str(value).strip()
+    if key in HABIT_MAPPING:
+        return HABIT_MAPPING[key]
+    return HABIT_MAPPING[key.lower()]
+
+
+def _to_gender(value):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return int(value)
+    key = str(value).strip()
+    if key in GENDER_MAPPING:
+        return GENDER_MAPPING[key]
+    lowered = key.lower()
+    if lowered == "male":
+        return 1
+    if lowered == "female":
+        return 0
+    return int(value)
+
+
+def prepare_inference_features(single_input_df, expected_columns, scaler):
+    """
+    Encode one user row the same way as load_all_processed_data, then scale
+    with the train-fitted scaler. Dummy columns are created without drop_first
+    and then aligned to the training schema so a single row cannot drop the
+    only present category.
+    """
+    df = pd.DataFrame(single_input_df).copy()
+
+    if "Gender" in df.columns:
+        df["Gender"] = df["Gender"].map(_to_gender)
+
+    if "Alcohol_Consumption" in df.columns:
+        df["Alcohol_Consumption"] = df["Alcohol_Consumption"].map(_to_habit)
+    if "Food_Between_Meals" in df.columns:
+        df["Food_Between_Meals"] = df["Food_Between_Meals"].map(_to_habit)
+
+    for col in YES_NO_COLS:
+        if col in df.columns:
+            df[col] = df[col].map(_to_yes_no)
+
+    present_cats = [col for col in CATEGORICAL_COLS if col in df.columns]
+    encoded = pd.get_dummies(df, columns=present_cats, drop_first=False)
+    encoded = encoded.reindex(columns=list(expected_columns), fill_value=0)
+    encoded = encoded.astype(float)
+
+    scaled_cols = [col for col in NUMERICAL_COLS if col in encoded.columns]
+    if scaled_cols:
+        encoded[scaled_cols] = scaler.transform(encoded[scaled_cols])
+
+    return encoded
+
+
+def run_prediction(model, scaler, expected_columns, single_input_df):
+    """Return (class index 0-6, probability vector aligned to CLASS_LABELS)."""
+    processed_input = prepare_inference_features(single_input_df, expected_columns, scaler)
+    predicted = int(model.predict(processed_input)[0])
+    proba_row = model.predict_proba(processed_input)[0]
+    ordered = [0.0] * len(CLASS_LABELS)
+    for i, cls in enumerate(model.classes_):
+        idx = int(cls)
+        if 0 <= idx < len(ordered):
+            ordered[idx] = float(proba_row[i])
+    return predicted, ordered
+
+
+def evaluate_classifier(model, X_test, y_test):
+    """Accuracy (%), macro F1, OvR ROC-AUC, and a full 7x7 confusion matrix."""
+    y_pred = model.predict(X_test)
+    y_pred_proba = model.predict_proba(X_test)
+    accuracy = float(model.score(X_test, y_test) * 100)
+    f1 = float(f1_score(y_test, y_pred, average="macro", labels=CLASS_LABELS, zero_division=0))
+    roc_auc = float(
+        roc_auc_score(
+            y_test,
+            y_pred_proba,
+            multi_class="ovr",
+            average="macro",
+            labels=CLASS_LABELS,
+        )
+    )
+    cm = confusion_matrix(y_test, y_pred, labels=CLASS_LABELS).tolist()
+    return accuracy, f1, roc_auc, cm
+
+
+def visualize_dataset_analysis():
+    """
+    Run this function independently in an isolated script execution block
+    to render your data profile plots on your desktop screen.
+    """
+    # Fresh temporary load to construct pristine data distributions
+    df = pd.read_csv('ObesityDataSet_raw_and_data_sinthetic.csv')
+    
+    # Graph 1: Missing Values
+    plt.figure(figsize=(10, 5))
+    sns.heatmap(df.isnull(), cbar=False, cmap="viridis", yticklabels=False)
+    plt.title("Data Inspection: Missing Values Heatmap")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+    plt.show()
+
+    # Graph 2: Duplicates Bar Chart
+    duplicate_count = df.duplicated().sum()
+    total_rows = len(df)
+    plt.figure(figsize=(6, 4))
+    sns.barplot(x=["Unique Rows", "Duplicate Rows"], y=[total_rows - duplicate_count, duplicate_count], palette=["#4CAF50", "#FF5252"])
+    plt.title(f"Data Inspection: Duplicate Rows (Found {duplicate_count})")
+    plt.ylabel("Number of Rows")
+    plt.tight_layout()
+    plt.show()
+
+    # Graph 3: Before vs After Scaling Curve Distributions
+    # (Re-running a swift, local pipeline copy to isolate scaled features cleanly)
+    rename_dict = {"family_history_with_overweight": "Family_History_Overweight", "FAVC": "High_Caloric_Food_Freq", "FCVC": "Vegetable_Consumption_Freq", "NCP": "Main_Meals_Per_Day", "CAEC": "Food_Between_Meals", "CH2O": "Water_Intake_Daily", "SCC": "Calories_Monitoring", "FAF": "Physical_Activity_Freq", "TUE": "Tech_Device_Usage_Time", "CALC": "Alcohol_Consumption", "MTRANS": "Transportation_Method", "NObeyesdad": "Obesity_Level"}
+    df = df.rename(columns=rename_dict).drop_duplicates()
+    
+    integer_attributes = ["Vegetable_Consumption_Freq", "Main_Meals_Per_Day", "Water_Intake_Daily", "Physical_Activity_Freq", "Tech_Device_Usage_Time", "Age"]
+    for col in integer_attributes: df[col] = df[col].round().astype(int)
+    df["Height"], df["Weight"] = df["Height"].round(2), df["Weight"].round(2)
+    
+    habit_mapping = {"no": 0, "Sometimes": 1, "Frequently": 2, "Always": 3}
+    df["Alcohol_Consumption"] = df["Alcohol_Consumption"].map(habit_mapping)
+    df["Food_Between_Meals"] = df["Food_Between_Meals"].map(habit_mapping)
+    df["Gender"] = df["Gender"].map({"Female": 0, "Male": 1})
+
+    X_temp = pd.get_dummies(df.drop(columns=["Obesity_Level"]), columns=["Family_History_Overweight", "High_Caloric_Food_Freq", "Calories_Monitoring", "Transportation_Method", "SMOKE"], drop_first=True)
+    
+    scaler = StandardScaler()
+    numerical_cols = ["Age", "Height", "Weight", "Vegetable_Consumption_Freq", "Main_Meals_Per_Day", "Water_Intake_Daily", "Physical_Activity_Freq", "Tech_Device_Usage_Time", "Alcohol_Consumption", "Food_Between_Meals"]
+    
+    X_scaled_temp = X_temp.copy()
+    X_scaled_temp[numerical_cols] = scaler.fit_transform(X_scaled_temp[numerical_cols])
+
+    fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(12, 5))
+    ax1.set_title('Features BEFORE StandardScaler')
+    sns.kdeplot(X_temp['Weight'], ax=ax1, color='r', label='Weight')
+    sns.kdeplot(X_temp['Height'], ax=ax1, color='b', label='Height')
+    sns.kdeplot(X_temp['Age'], ax=ax1, color='g', label='Age')
+    ax1.set_xlabel('Original Units Range')
+    ax1.legend()
+
+    ax2.set_title('Features AFTER StandardScaler')
+    sns.kdeplot(X_scaled_temp['Weight'], ax=ax2, color='r', label='Weight')
+    sns.kdeplot(X_scaled_temp['Height'], ax=ax2, color='b', label='Height')
+    sns.kdeplot(X_scaled_temp['Age'], ax=ax2, color='g', label='Age')
+    ax2.set_xlabel('Standardized Z-Score Unit Scale (-3 to +3)')
+    ax2.legend()
+    plt.tight_layout()
+    plt.show()
