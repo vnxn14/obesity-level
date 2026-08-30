@@ -42,7 +42,6 @@ from data_loader import (
 # Page configurations
 st.set_page_config(page_title="Obesity Risk Predictor", page_icon="🏋️", layout="wide")
 st.title("🏋️‍♂️ Multi-Model Obesity Risk Prediction Dashboard")
-st.caption("Adjust your profile on the right — every chart on the left updates live as you type.")
 
 # --- CUSTOM CSS FOR THE APP & CONFUSION MATRIX ---
 st.markdown("""
@@ -503,7 +502,7 @@ with main_output_col:
 
     with view_tab5:
         st.subheader("📈 Exploratory Data Analysis")
-        st.caption("Excel-style 3D charts generated directly from the raw dataset.")
+        st.caption("Preprocessing graphs and Obesity Level Distribution for each feature.")
 
         eda_col1, eda_col2 = st.columns(2)
         with eda_col1:
@@ -519,7 +518,7 @@ with main_output_col:
 
     with view_tab4:
         st.subheader("🏆 Model Comparison")
-        st.caption("All four models plotted on the same 5 metrics (as %). Pulled from cache, so switching tabs doesn't retrain anything.")
+        st.caption("All four models plotted on the same 5 metrics (as %).")
         with st.spinner("Loading cached metrics for all models..."):
             all_metrics = get_all_model_metrics()
 
@@ -583,6 +582,7 @@ with main_output_col:
         bmi_category, bmi_color = get_bmi_category(calculated_bmi)
 
         with view_tab1:
+            st.caption("Adjust your profile on the right — every chart on the left updates live as you type.")
             # --- Section 1: BMI dial + body silhouette, side by side ---
             st.subheader("📈 Live BMI & Body Snapshot")
             dial_col, avatar_col = st.columns([1.3, 1.0], gap="small", vertical_alignment="top")
