@@ -252,11 +252,6 @@ def get_all_model_metrics():
 
 
 def render_3d_bar_comparison(metrics: dict):
-    """
-    Real interactive 3D bar chart (rotatable/zoomable) comparing all models
-    across 5 metrics. Each bar is a Mesh3d cuboid: metric on one axis,
-    model on the other, score (%) as height.
-    """
     categories = ["Accuracy", "Precision", "Recall", "F1-Score", "ROC-AUC"]
     models = list(metrics.keys())
     palette = ["#2ec4b6", "#8ac926", "#5865f2", "#ff6f59", "#f4a261", "#e63946"]

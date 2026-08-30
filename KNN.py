@@ -18,7 +18,6 @@ TARGET_MAP = {code: name for name, code in target_mapping.items()}
 def train_knn_model():
     X_train_scaled, X_test_scaled, y_train, y_test, scaler, _X = load_all_processed_data()
 
-    # Capture the exact structural column index directly from X_train_scaled
     trained_column_order = X_train_scaled.columns
 
     knn_model = KNeighborsClassifier(n_neighbors=5, weights="distance", metric="minkowski", p=2)

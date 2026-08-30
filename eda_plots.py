@@ -15,7 +15,7 @@ plt.figure(figsize=(10, 8))  # 1. Open a clean figure
 sns.heatmap(df.corr(numeric_only=True), annot=True, cmap="coolwarm")
 plt.title("Feature Correlation Heatmap")
 plt.savefig("correlation_heatmap.png")
-plt.close()                  # 2. Close it completely when done!
+plt.close() 
 
 # ==========================================
 # PLOT 2: Distribution of Obesity Levels
@@ -28,5 +28,5 @@ plt.xlabel("Count")
 plt.ylabel("Obesity Level")
 plt.tight_layout()
 plt.savefig("obesity_distribution.png")
-plt.close()                  # 4. Close it completely!
+plt.close()
 

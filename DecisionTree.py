@@ -18,15 +18,13 @@ TARGET_MAP = {code: name for name, code in target_mapping.items()}
 def train_decision_tree_model():
     X_train_scaled, X_test_scaled, y_train, y_test, scaler, _X = load_all_processed_data()
 
-    # Capture the exact structural column index directly from X_train_scaled
     trained_column_order = X_train_scaled.columns
 
-    # Added structural pre-pruning constraints to combat overfitting
     decision_tree_model = DecisionTreeClassifier(
         criterion="gini",
-        max_depth=8,              # Limits the maximum breakdown depth layers
-        min_samples_split=10,      # Requires at least 10 samples to create a new split node
-        min_samples_leaf=4,        # Each terminal leaf must contain at least 4 samples
+        max_depth=8,
+        min_samples_split=10,
+        min_samples_leaf=4,
         random_state=42
     )
     decision_tree_model.fit(X_train_scaled, y_train)

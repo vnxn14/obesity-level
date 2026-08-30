@@ -5,7 +5,6 @@ from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-# Expose target_mapping universally so main.py can use it for labels
 target_mapping = {
     "Insufficient_Weight": 0,
     "Normal_Weight": 1,
