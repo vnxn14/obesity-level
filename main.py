@@ -491,7 +491,7 @@ with main_output_col:
     )
 
     with view_tab5:
-        st.subheader("📈 Exploratory Data Analysis")
+        st.subheader("Exploratory Data Analysis")
         st.caption("Preprocessing graphs and Obesity Level Distribution for each feature.")
 
         eda_col1, eda_col2 = st.columns(2)
