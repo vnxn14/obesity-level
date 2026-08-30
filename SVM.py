@@ -23,8 +23,8 @@ def train_svm_model():
     )
     svm_model.fit(X_train_scaled, y_train)
 
-    accuracy, f1, roc_auc, cm = evaluate_classifier(svm_model, X_test_scaled, y_test)
-    return svm_model, scaler, trained_column_order, accuracy, f1, roc_auc, cm
+    accuracy, precision, recall, f1, roc_auc, cm = evaluate_classifier(svm_model, X_test_scaled, y_test)
+    return svm_model, scaler, trained_column_order, accuracy, precision, recall, f1, roc_auc, cm
 
 
 def get_trained_svm_model():
@@ -36,5 +36,5 @@ def predict_svm(model, scaler, expected_columns_order, single_input_df):
 
 
 if __name__ == "__main__":
-    model, scaler, expected_columns_order, accuracy, f1, roc_auc, cm = train_svm_model()
-    print(f"SVM trained. Test Accuracy: {accuracy:.2f}%  F1: {f1:.3f}  ROC-AUC: {roc_auc:.3f}")
+    model, scaler, expected_columns_order, accuracy, precision, recall, f1, roc_auc, cm = train_svm_model()
+    print(f"SVM trained. Test Accuracy: {accuracy:.2f}% | Precision: {precision:.3f} | Recall: {recall:.3f} | F1: {f1:.3f} | ROC-AUC: {roc_auc:.3f}")

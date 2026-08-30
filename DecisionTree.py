@@ -24,8 +24,8 @@ def train_decision_tree_model():
     decision_tree_model = DecisionTreeClassifier(criterion="gini", random_state=42)
     decision_tree_model.fit(X_train_scaled, y_train)
 
-    accuracy, f1, roc_auc, cm = evaluate_classifier(decision_tree_model, X_test_scaled, y_test)
-    return decision_tree_model, scaler, trained_column_order, accuracy, f1, roc_auc, cm
+    accuracy, precision, recall, f1, roc_auc, cm = evaluate_classifier(decision_tree_model, X_test_scaled, y_test)
+    return decision_tree_model, scaler, trained_column_order, accuracy, precision, recall, f1, roc_auc, cm
 
 
 def get_trained_decision_tree_model():
@@ -128,8 +128,8 @@ def ask_height_meters():
 
 
 if __name__ == "__main__":
-    model, scaler, expected_columns_order, accuracy, f1, roc_auc, cm = train_decision_tree_model()
-    print(f"Decision Tree trained. Test Accuracy: {accuracy:.2f}%  F1: {f1:.3f}  ROC-AUC: {roc_auc:.3f}")
+    model, scaler, expected_columns_order, accuracy, precision, recall, f1, roc_auc, cm = train_decision_tree_model()
+    print(f"Decision Tree trained. Test Accuracy: {accuracy:.2f}% | Precision: {precision:.3f} | Recall: {recall:.3f} | F1: {f1:.3f} | ROC-AUC: {roc_auc:.3f}")
     single_input_df = get_user_input_cli(expected_columns_order)
     prediction, _probabilities = predict_decision_tree(
         model, scaler, expected_columns_order, single_input_df

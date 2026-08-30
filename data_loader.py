@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -195,10 +195,12 @@ def run_prediction(model, scaler, expected_columns, single_input_df):
 
 
 def evaluate_classifier(model, X_test, y_test):
-    """Accuracy (%), macro F1, OvR ROC-AUC, and a full 7x7 confusion matrix."""
+    """Accuracy (%), macro precision/recall/F1, OvR ROC-AUC, and a full 7x7 confusion matrix."""
     y_pred = model.predict(X_test)
     y_pred_proba = model.predict_proba(X_test)
     accuracy = float(model.score(X_test, y_test) * 100)
+    precision = float(precision_score(y_test, y_pred, average="macro", labels=CLASS_LABELS, zero_division=0))
+    recall = float(recall_score(y_test, y_pred, average="macro", labels=CLASS_LABELS, zero_division=0))
     f1 = float(f1_score(y_test, y_pred, average="macro", labels=CLASS_LABELS, zero_division=0))
     roc_auc = float(
         roc_auc_score(
@@ -210,7 +212,7 @@ def evaluate_classifier(model, X_test, y_test):
         )
     )
     cm = confusion_matrix(y_test, y_pred, labels=CLASS_LABELS).tolist()
-    return accuracy, f1, roc_auc, cm
+    return accuracy, precision, recall, f1, roc_auc, cm
 
 
 def visualize_dataset_analysis():

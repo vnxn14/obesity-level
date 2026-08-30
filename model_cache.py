@@ -3,17 +3,13 @@ import joblib
 
 CACHE_DIR = "model_cache"
 
-# Bump this whenever data_loader.py, the underlying dataset, or a model's
-# training logic changes. It's baked into the cache filename, so bumping it
-# invalidates every existing pickle and forces a clean retrain on next run —
-# without needing to know the internals of data_loader.py to detect the
-# change automatically.
-CACHE_VERSION = "v9"
+# Bumped version string to v10 to clear old files and enforce 9-value structure
+CACHE_VERSION = "v10"
 
 
 def load_or_train(model_name: str, train_fn):
     """
-    Loads a cached (model, scaler, columns, accuracy, f1, roc_auc, cm) tuple from disk if one
+    Loads a cached (model, scaler, columns, accuracy, precision, recall, f1, roc_auc, cm) tuple from disk if one
     exists for this model + CACHE_VERSION. Otherwise calls train_fn() (a
     zero-arg callable, e.g. train_ann_model) to train fresh, saves the
     result to disk, and returns it.

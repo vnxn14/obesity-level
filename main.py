@@ -351,25 +351,26 @@ with main_output_col:
     )
 
     prediction_index, probabilities = 0, None
-    accuracy_score, f1_score_val, roc_auc_val = 0.0, 0.0, 0.0
+    accuracy_score, precision_score_val, recall_score_val, f1_score_val, roc_auc_val = 0.0, 0.0, 0.0, 0.0, 0.0
     actual_cm_array = [[0] * len(MATRIX_LABELS) for _ in MATRIX_LABELS]
     prediction_failed = False
 
     try:
         if selected_model == "ANN (Artificial Neural Network)":
-            model, scaler, cols, acc, f1, auc, cm = get_trained_ann_model()
+            model, scaler, cols, acc, prec, rec, f1, auc, cm = get_trained_ann_model()
             prediction_index, probabilities = predict_ann(model, scaler, cols, input_df)
         elif selected_model == "KNN (K-Nearest Neighbors)":
-            model, scaler, cols, acc, f1, auc, cm = get_trained_knn_model()
+            model, scaler, cols, acc, prec, rec, f1, auc, cm = get_trained_knn_model()
             prediction_index, probabilities = predict_knn(model, scaler, cols, input_df)
         elif selected_model == "SVM (Support Vector Machine)":
-            model, scaler, cols, acc, f1, auc, cm = get_trained_svm_model()
+            model, scaler, cols, acc, prec, rec, f1, auc, cm = get_trained_svm_model()
             prediction_index, probabilities = predict_svm(model, scaler, cols, input_df)
         elif selected_model == "Decision Tree":
-            model, scaler, cols, acc, f1, auc, cm = get_trained_decision_tree_model()
+            model, scaler, cols, acc, prec, rec, f1, auc, cm = get_trained_decision_tree_model()
             prediction_index, probabilities = predict_decision_tree(model, scaler, cols, input_df)
 
-        accuracy_score, f1_score_val, roc_auc_val, actual_cm_array = acc, f1, auc, cm
+        accuracy_score, precision_score_val, recall_score_val, f1_score_val, roc_auc_val, actual_cm_array = acc, prec, rec, f1, auc, cm
+
     except Exception as e:
         prediction_failed = True
         with view_tab1:
@@ -408,12 +409,16 @@ with main_output_col:
 
         with view_tab3:
             st.subheader("🎯 Evaluation Performance Metrics")
-            h_col1, h_col2, h_col3 = st.columns(3)
+            h_col1, h_col2, h_col3, h_col4, h_col5 = st.columns(5)
             with h_col1:
                 metric_card("Accuracy", f"{accuracy_score:.1f}%")
             with h_col2:
-                metric_card("F1-Score", f"{f1_score_val:.2f}")
+                metric_card("Precision", f"{precision_score_val:.2f}")
             with h_col3:
+                metric_card("Recall", f"{recall_score_val:.2f}")
+            with h_col4:
+                metric_card("F1-Score", f"{f1_score_val:.2f}")
+            with h_col5:
                 metric_card("ROC-AUC", f"{roc_auc_val:.2f}")
             st.write("")
             st.markdown(generate_html_confusion_matrix(actual_cm_array), unsafe_allow_html=True)
