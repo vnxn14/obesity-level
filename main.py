@@ -153,6 +153,73 @@ def render_probability_bar(probs: np.ndarray, predicted_idx: int, highlight_colo
     return fig
 
 
+def _hex_to_rgba(hex_color: str, alpha: float = 0.35) -> str:
+    hex_color = hex_color.lstrip("#")
+    r, g, b = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+@st.cache_data(show_spinner=False)
+def get_all_model_metrics():
+    """
+    Fetch (from the on-disk model cache — no retraining) accuracy, precision,
+    recall, F1, and ROC-AUC for every model, normalized to a 0-1 scale so
+    they can be compared on one radar chart.
+    """
+    model_getters = {
+        "ANN": get_trained_ann_model,
+        "KNN": get_trained_knn_model,
+        "SVM": get_trained_svm_model,
+        "Decision Tree": get_trained_decision_tree_model,
+    }
+    metrics = {}
+    for name, getter in model_getters.items():
+        _, _, _, acc, prec, rec, f1, auc, _ = getter()
+        metrics[name] = {
+            "Accuracy": acc / 100.0,
+            "Precision": prec,
+            "Recall": rec,
+            "F1-Score": f1,
+            "ROC-AUC": auc,
+        }
+    return metrics
+
+
+def render_radar_comparison(metrics: dict):
+    """Overlaid radar/spider chart comparing all models across 5 metrics."""
+    categories = ["Accuracy", "Precision", "Recall", "F1-Score", "ROC-AUC"]
+    palette = ["#3498db", "#2ecc71", "#e67e22", "#9b59b6"]
+
+    fig = go.Figure()
+    for i, (model_name, scores) in enumerate(metrics.items()):
+        values = [scores[c] * 100 for c in categories]
+        values.append(values[0])  # close the loop
+        color = palette[i % len(palette)]
+        fig.add_trace(go.Scatterpolar(
+            r=values,
+            theta=categories + categories[:1],
+            name=model_name,
+            line=dict(color=color, width=2.5),
+            fillcolor=_hex_to_rgba(color, 0.30),
+            fill="toself",
+            hovertemplate="%{theta}: %{r:.1f}%<extra>" + model_name + "</extra>",
+        ))
+
+    fig.update_layout(
+        polar=dict(
+            bgcolor="white",
+            radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%", gridcolor="#e9ecef"),
+            angularaxis=dict(gridcolor="#e9ecef"),
+        ),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+        height=540,
+        margin=dict(l=60, r=60, t=40, b=40),
+        paper_bgcolor="white",
+    )
+    return fig
+
+
 def generate_html_confusion_matrix(matrix_array):
     row_sums = [sum(r) for r in matrix_array]
     table_html = '<table class="cm-table">'
@@ -346,9 +413,20 @@ with main_input_col:
     input_df = pd.DataFrame([raw_input_data])
 
 with main_output_col:
-    view_tab1, view_tab3 = st.tabs(
-        ["🔵 Live Assessment", "📊 Confusion Matrix Analytics"]
+    view_tab1, view_tab3, view_tab4 = st.tabs(
+        ["🔵 Live Assessment", "📊 Confusion Matrix Analytics", "🏆 Model Comparison"]
     )
+
+    with view_tab4:
+        st.subheader("🏆 Model Comparison — Radar View")
+        st.caption("All four models plotted on the same 5 metrics (as %). Pulled from cache, so switching tabs doesn't retrain anything.")
+        with st.spinner("Loading cached metrics for all models..."):
+            all_metrics = get_all_model_metrics()
+        st.plotly_chart(render_radar_comparison(all_metrics), use_container_width=True)
+
+        comparison_df = pd.DataFrame(all_metrics).T
+        comparison_df = comparison_df[["Accuracy", "Precision", "Recall", "F1-Score", "ROC-AUC"]]
+        st.dataframe(comparison_df.style.format("{:.3f}").background_gradient(cmap="Greens", axis=0), use_container_width=True)
 
     prediction_index, probabilities = 0, None
     accuracy_score, precision_score_val, recall_score_val, f1_score_val, roc_auc_val = 0.0, 0.0, 0.0, 0.0, 0.0
@@ -413,12 +491,12 @@ with main_output_col:
             with h_col1:
                 metric_card("Accuracy", f"{accuracy_score:.1f}%")
             with h_col2:
-                metric_card("Precision", f"{precision_score_val:.2f}")
+                metric_card("Precision", f"{precision_score_val:.3f}")
             with h_col3:
-                metric_card("Recall", f"{recall_score_val:.2f}")
+                metric_card("Recall", f"{recall_score_val:.3f}")
             with h_col4:
-                metric_card("F1-Score", f"{f1_score_val:.2f}")
+                metric_card("F1-Score", f"{f1_score_val:.3f}")
             with h_col5:
-                metric_card("ROC-AUC", f"{roc_auc_val:.2f}")
+                metric_card("ROC-AUC", f"{roc_auc_val:.3f}")
             st.write("")
             st.markdown(generate_html_confusion_matrix(actual_cm_array), unsafe_allow_html=True)
