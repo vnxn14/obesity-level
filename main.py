@@ -227,11 +227,6 @@ def _hex_to_rgba(hex_color: str, alpha: float = 0.35) -> str:
 
 @st.cache_data(show_spinner=False)
 def get_all_model_metrics():
-    """
-    Fetch (from the on-disk model cache — no retraining) accuracy, precision,
-    recall, F1, and ROC-AUC for every model, normalized to a 0-1 scale so
-    they can be compared on one radar chart.
-    """
     model_getters = {
         "ANN": get_trained_ann_model,
         "KNN": get_trained_knn_model,
@@ -425,7 +420,7 @@ def metric_card(title: str, value: str):
 main_output_col, main_input_col = st.columns([1.2, 1.0], gap="large")
 
 with main_input_col:
-    st.subheader("👤 Model Selection & Patient Attributes")
+    st.subheader("Model Selection & Patient Attributes")
     selected_model = st.selectbox(
         "Choose an Active Machine Learning Model",
         ["ANN (Artificial Neural Network)", "KNN (K-Nearest Neighbors)", "SVM (Support Vector Machine)", "Decision Tree"],
@@ -512,7 +507,7 @@ with main_output_col:
         st.pyplot(eda_fig, use_container_width=True)
 
     with view_tab4:
-        st.subheader("🏆 Model Comparison")
+        st.subheader("Model Comparison")
         st.caption("All four models plotted on the same 5 metrics (as %).")
         with st.spinner("Loading cached metrics for all models..."):
             all_metrics = get_all_model_metrics()
@@ -530,14 +525,24 @@ with main_output_col:
 
         st.write("")
         chart_style = st.radio(
-            "Chart style", ["🧊 Isometric 3D"], horizontal=True, label_visibility="collapsed"
+            "Chart style", ["Isometric 3D"], horizontal=True, label_visibility="collapsed"
         )
         st.caption("Drag to rotate • scroll to zoom • hover a bar for its exact value")
         st.plotly_chart(render_3d_bar_comparison(all_metrics), use_container_width=True)
 
+        def _highlight_best(col):
+            is_best = col == col.max()
+            return [
+                "background-color: #1b7a3d; color: white; font-weight: 600;" if best else ""
+                for best in is_best
+            ]
+
         comparison_df = pd.DataFrame(all_metrics).T
         comparison_df = comparison_df[["Accuracy", "Precision", "Recall", "F1-Score", "ROC-AUC"]]
-        st.dataframe(comparison_df.style.format("{:.3f}").background_gradient(cmap="Greens", axis=0), use_container_width=True)
+        st.dataframe(
+            comparison_df.style.format("{:.3f}").apply(_highlight_best, axis=0),
+            use_container_width=True,
+        )
 
     prediction_index, probabilities = 0, None
     accuracy_score, precision_score_val, recall_score_val, f1_score_val, roc_auc_val = 0.0, 0.0, 0.0, 0.0, 0.0
@@ -579,7 +584,7 @@ with main_output_col:
         with view_tab1:
             st.caption("Adjust your profile on the right — every chart on the left updates live as you type.")
             # --- Section 1: BMI dial + body silhouette, side by side ---
-            st.subheader("📈 Live BMI & Body Snapshot")
+            st.subheader("Live BMI & Body Snapshot")
             dial_col, avatar_col = st.columns([1.3, 1.0], gap="small", vertical_alignment="top")
             with dial_col:
                 st.plotly_chart(render_bmi_dial(calculated_bmi, bmi_color), use_container_width=True)
@@ -587,7 +592,7 @@ with main_output_col:
                 st.pyplot(render_avatar(height, weight, bmi_color), use_container_width=False)
 
             # --- Section 2: model prediction gauge + probability bar ---
-            st.subheader("📊 Live Prediction Classification Results")
+            st.subheader("Live Prediction Classification Results")
             m_col1, m_col2 = st.columns(2)
             with m_col1:
                 metric_card("Predicted Category", predicted_label)
@@ -598,7 +603,7 @@ with main_output_col:
             st.plotly_chart(render_probability_bar(probs_array, predicted_idx, band_color), use_container_width=True)
 
         with view_tab3:
-            st.subheader("🎯 Evaluation Performance Metrics")
+            st.subheader("Evaluation Performance Metrics")
             h_col1, h_col2, h_col3, h_col4, h_col5 = st.columns(5)
             with h_col1:
                 metric_card("Accuracy", f"{accuracy_score:.1f}%")
