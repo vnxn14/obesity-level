@@ -524,10 +524,7 @@ with main_output_col:
             metric_card("Metric Scope", "Multi-Class (7 categories)")
 
         st.write("")
-        chart_style = st.radio(
-            "Chart style", ["Isometric 3D"], horizontal=True, label_visibility="collapsed"
-        )
-        st.caption("Drag to rotate • scroll to zoom • hover a bar for its exact value")
+        st.caption("Isometric 3D Graph")
         st.plotly_chart(render_3d_bar_comparison(all_metrics), use_container_width=True)
 
         def _highlight_best(col):
