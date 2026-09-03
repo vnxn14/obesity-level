@@ -176,11 +176,11 @@ EDA_CHART_CATEGORIES = {
     "🕸️ Multivariate (Lifestyle Profile)": {
         "Insufficient Weight": insufficient_weight_chart,
         "Normal Weight": normal_weight_chart,
+        "Overweight Level I": overweight_level_i_chart,
+        "Overweight Level II": overweight_level_ii_chart,
         "Obesity Type I": obesity_type_i_chart,
         "Obesity Type II": obesity_type_ii_chart,
         "Obesity Type III": obesity_type_iii_chart,
-        "Overweight Level I": overweight_level_i_chart,
-        "Overweight Level II": overweight_level_ii_chart,
     },
     "🧹 Data Preprocessing": {
         "Missing Values Heatmap": missing_values_heatmap_chart,
