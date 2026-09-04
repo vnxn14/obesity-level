@@ -3,3 +3,8 @@ scikit-learn
 pandas 
 numpy 
 plotly
+matplotlib
+streamlit
+seabrorn
+os
+joblib
